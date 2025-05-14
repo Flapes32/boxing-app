@@ -56,6 +56,24 @@ struct Exercise: Identifiable, Hashable, Codable {
     let commonMistakes: [String]
     let equipment: [String]
     
+    init(id: String, name: String, description: String, instructions: String, category: ExerciseCategory, difficulty: WorkoutDifficulty, targetMuscles: [MuscleGroup], duration: Int? = nil, repetitions: Int? = nil, sets: Int? = nil, restBetweenSets: Int? = nil, videoURL: String? = nil, tips: [String] = [], commonMistakes: [String] = [], equipment: [String] = []) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.instructions = instructions
+        self.category = category
+        self.difficulty = difficulty
+        self.targetMuscles = targetMuscles
+        self.duration = duration
+        self.repetitions = repetitions
+        self.sets = sets
+        self.restBetweenSets = restBetweenSets
+        self.videoURL = videoURL
+        self.tips = tips
+        self.commonMistakes = commonMistakes
+        self.equipment = equipment
+    }
+    
     // Вычисляемое свойство для отображения формата упражнения
     var format: String {
         if let repetitions = repetitions, let sets = sets {
