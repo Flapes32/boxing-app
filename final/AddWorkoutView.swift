@@ -1,4 +1,5 @@
 import SwiftUI
+import RealmSwift
 
 struct AddWorkoutView: View {
     @State private var repetitions: String = ""
@@ -24,7 +25,7 @@ struct AddWorkoutView: View {
                 }
             }
             .padding()
-            .alert(isPresented: .constant(false)) {
+            .alert(isPresented: $isAlertPresented) {
                 Alert(title: Text("Успех"), message: Text("Тренировка добавлена!"), dismissButton: .default(Text("ОК")))
             }
         }

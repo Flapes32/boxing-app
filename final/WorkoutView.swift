@@ -1,4 +1,5 @@
 import SwiftUI
+import RealmSwift
 
 struct WorkoutView: View {
     @State private var showingAddWorkout = false
@@ -141,7 +142,16 @@ struct WorkoutView: View {
             AddWorkoutView(
                 exerciseName: selectedWorkout,
                 onSave: { repetitions in
-                    print("Saved workout: \(selectedWorkout) with \(repetitions) repetitions")
+                    // Находим упражнение по имени
+                    if let exercise = ExerciseDatabase.exercises.first(where: { $0.name == selectedWorkout }) {
+                        // Сохраняем запись в базу данных
+                        WorkoutRecordService.shared.saveWorkoutRecord(
+                            exerciseId: exercise.id,
+                            exerciseName: exercise.name,
+                            repetitions: repetitions
+                        )
+                        print("Saved workout: \(selectedWorkout) with \(repetitions) repetitions")
+                    }
                     showingAddWorkout = false
                 }
             )
