@@ -8,7 +8,7 @@ struct MoreOptionsView: View {
         MenuOption(title: "Достижения", icon: "trophy.fill", color: .yellow, destination: AnyView(AchievementsView())),
         MenuOption(title: "Восстановление", icon: "heart.fill", color: .green, destination: AnyView(RecoveryView())),
         MenuOption(title: "Вопросы и ответы", icon: "questionmark.circle.fill", color: .blue, destination: AnyView(FAQView())),
-        MenuOption(title: "Таймер", icon: "timer", color: .orange, destination: AnyView(TimerView())),
+        MenuOption(title: "Таймер", icon: "timer", color: .orange, destination: AnyView(TimerView(workoutExercises: []))),
         MenuOption(title: "Интеграция с Apple Watch", icon: "applewatch", color: .gray, destination: AnyView(AppleWatchIntegrationView()))
     ]
     

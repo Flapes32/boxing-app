@@ -8,6 +8,10 @@ struct WorkoutView: View {
     @State private var searchText = ""
     @State private var selectedLevel = "Все"
     @State private var selectedCategory = "Все"
+    @State private var workoutExercises: [WorkoutExercise] = []
+    @State private var showingRoundsDialog = false
+    @State private var tempExercise: Exercise? = nil
+    @State private var numberOfRounds: Int = 1
     
     // Уровни сложности
     let levels = ["Все", "Начинающий", "Средний", "Продвинутый", "Профессионал"]
@@ -56,6 +60,39 @@ struct WorkoutView: View {
                               workout.description.localizedCaseInsensitiveContains(searchText)
             
             return levelMatch && categoryMatch && searchMatch
+        }
+    }
+    
+    // Функция для проверки, выбрано ли упражнение
+    func isWorkoutSelected(_ name: String) -> Bool {
+        workoutExercises.contains(where: { $0.exercise.name == name })
+    }
+    
+    // Функция для добавления упражнения в список
+    func addExercise(_ exercise: Exercise, rounds: Int) {
+        let workoutExercise = WorkoutExercise(exercise: exercise, rounds: rounds)
+        workoutExercises.append(workoutExercise)
+    }
+    
+    // Функция для удаления упражнения из списка
+    func removeWorkoutExercise(_ workoutExercise: WorkoutExercise) {
+        if let index = workoutExercises.firstIndex(where: { $0.id == workoutExercise.id }) {
+            workoutExercises.remove(at: index)
+        }
+    }
+    
+    // Функция для обработки нажатия на упражнение
+    func handleExerciseTap(_ exercise: Exercise) {
+        if isWorkoutSelected(exercise.name) {
+            // Если упражнение уже выбрано, удаляем его
+            if let index = workoutExercises.firstIndex(where: { $0.exercise.name == exercise.name }) {
+                workoutExercises.remove(at: index)
+            }
+        } else {
+            // Если упражнение не выбрано, показываем диалог для выбора количества раундов
+            tempExercise = exercise
+            numberOfRounds = 1
+            showingRoundsDialog = true
         }
     }
     
@@ -109,19 +146,63 @@ struct WorkoutView: View {
                 ScrollView {
                     LazyVStack(spacing: 15) {
                         ForEach(filteredWorkouts) { workout in
-                            WorkoutCard(workout: workout)
+                            WorkoutCard(workout: workout, isSelected: isWorkoutSelected(workout.name))
                                 .onTapGesture {
-                                    selectedWorkout = workout.name
-                                    showingAddWorkout = true
+                                    if let exercise = ExerciseDatabase.exercises.first(where: { $0.name == workout.name }) {
+                                        handleExerciseTap(exercise)
+                                    }
                                 }
                         }
                     }
                     .padding(.horizontal)
                 }
                 
+                // Выбранные упражнения
+                if !workoutExercises.isEmpty {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Выбранные упражнения: \(workoutExercises.count)")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(.horizontal)
+                            .padding(.top, 10)
+                        
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(workoutExercises, id: \.id) { workoutExercise in
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(workoutExercise.exercise.name)
+                                                .foregroundColor(.white)
+                                                .font(.subheadline)
+                                            
+                                            Text("\(workoutExercise.rounds) раунд(ов)")
+                                                .foregroundColor(.white.opacity(0.7))
+                                                .font(.caption)
+                                        }
+                                        
+                                        Button(action: {
+                                            removeWorkoutExercise(workoutExercise)
+                                        }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .foregroundColor(.red)
+                                        }
+                                    }
+                                    .padding(.vertical, 5)
+                                    .padding(.horizontal, 10)
+                                    .background(Color(.systemGray6).opacity(0.5))
+                                    .cornerRadius(15)
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
+                }
+                
                 // Кнопка начать тренировку
                 Button(action: {
-                    showingTimer = true
+                    if !workoutExercises.isEmpty {
+                        showingTimer = true
+                    }
                 }) {
                     Text("Начать тренировку")
                         .font(.headline)
@@ -129,15 +210,37 @@ struct WorkoutView: View {
                         .foregroundColor(.white)
                         .frame(height: 50)
                         .frame(maxWidth: .infinity)
-                        .background(Color.blue)
+                        .background(!workoutExercises.isEmpty ? Color.blue : Color.gray)
                         .cornerRadius(10)
                 }
+                .disabled(workoutExercises.isEmpty)
                 .padding(.horizontal)
                 .padding(.vertical, 15)
             }
         }
         .navigationTitle("Тренировки")
         .navigationBarTitleDisplayMode(.large)
+        .alert("Выберите количество раундов", isPresented: $showingRoundsDialog) {
+            TextField("Количество раундов", value: $numberOfRounds, formatter: NumberFormatter())
+                .keyboardType(.numberPad)
+            
+            Button("Отмена", role: .cancel) {
+                tempExercise = nil
+            }
+            
+            Button("Добавить") {
+                if let exercise = tempExercise, numberOfRounds > 0 {
+                    addExercise(exercise, rounds: numberOfRounds)
+                }
+                tempExercise = nil
+            }
+        } message: {
+            if let exercise = tempExercise {
+                Text("Упражнение: \(exercise.name)\n\nУкажите, сколько раундов этого упражнения вы хотите добавить в тренировку")
+            } else {
+                Text("")
+            }
+        }
         .sheet(isPresented: $showingAddWorkout) {
             AddWorkoutView(
                 exerciseName: selectedWorkout,
@@ -158,7 +261,7 @@ struct WorkoutView: View {
         }
         .fullScreenCover(isPresented: $showingTimer) {
             NavigationView {
-                TimerView()
+                TimerView(workoutExercises: workoutExercises)
             }
         }
     }
@@ -206,10 +309,10 @@ struct FilterButton: View {
             Text(title)
                 .font(.subheadline)
                 .fontWeight(isSelected ? .bold : .regular)
+                .foregroundColor(isSelected ? .white : .gray)
                 .padding(.vertical, 8)
                 .padding(.horizontal, 16)
                 .background(isSelected ? Color.blue : Color(.systemGray6).opacity(0.3))
-                .foregroundColor(isSelected ? .white : .white.opacity(0.8))
                 .cornerRadius(20)
         }
     }
@@ -218,110 +321,106 @@ struct FilterButton: View {
 // Компонент карточки тренировки
 struct WorkoutCard: View {
     let workout: WorkoutUI
+    let isSelected: Bool
     @State private var showDetails = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(workout.name)
-                .font(.headline)
-                .foregroundColor(.white)
+            HStack {
+                Text(workout.name)
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                }
+            }
             
             Text(workout.description)
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .lineLimit(2)
             
-            HStack {
+            HStack(spacing: 15) {
                 // Категория
-                Text(workout.category)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(categoryColor(workout.category).opacity(0.2))
-                    .foregroundColor(categoryColor(workout.category))
-                    .cornerRadius(4)
+                HStack(spacing: 5) {
+                    Image(systemName: categoryIcon(workout.category))
+                        .foregroundColor(categoryColor(workout.category))
+                    Text(workout.category)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
                 
-                // Уровень
-                Text(workout.level)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(levelColor(workout.level).opacity(0.2))
-                    .foregroundColor(levelColor(workout.level))
-                    .cornerRadius(4)
+                // Уровень сложности
+                HStack(spacing: 5) {
+                    Image(systemName: "speedometer")
+                        .foregroundColor(.yellow)
+                    Text(workout.level)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
                 
-                Spacer()
-                
-                // Формат упражнения
-                Text(workout.format.isEmpty ? "\(workout.duration) сек" : workout.format)
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.blue.opacity(0.2))
-                    .foregroundColor(Color.blue)
-                    .cornerRadius(4)
+                // Формат (длительность или повторения)
+                HStack(spacing: 5) {
+                    Image(systemName: workout.repetitions != nil ? "number" : "clock")
+                        .foregroundColor(.blue)
+                    Text(workout.format)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                }
             }
             
             if showDetails {
                 VStack(alignment: .leading, spacing: 10) {
                     if !workout.tips.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text("Советы:")
                                 .font(.subheadline)
-                                .fontWeight(.medium)
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                             
                             ForEach(workout.tips, id: \.self) { tip in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("•")
-                                        .foregroundColor(.gray)
-                                    Text(tip)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
+                                Text("• \(tip)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
                         }
                     }
                     
                     if !workout.commonMistakes.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text("Распространенные ошибки:")
                                 .font(.subheadline)
-                                .fontWeight(.medium)
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                             
                             ForEach(workout.commonMistakes, id: \.self) { mistake in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("•")
-                                        .foregroundColor(.gray)
-                                    Text(mistake)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
+                                Text("• \(mistake)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
                         }
                     }
                     
                     if !workout.equipment.isEmpty {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text("Необходимое оборудование:")
                                 .font(.subheadline)
-                                .fontWeight(.medium)
+                                .fontWeight(.bold)
                                 .foregroundColor(.white)
                             
                             ForEach(workout.equipment, id: \.self) { item in
-                                HStack(alignment: .top, spacing: 4) {
-                                    Text("•")
-                                        .foregroundColor(.gray)
-                                    Text(item)
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                }
+                                Text("• \(item)")
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
                             }
                         }
                     }
                 }
-                .padding(.top, 4)
+                .padding(.top, 5)
             }
             
             Button(action: {
@@ -349,31 +448,43 @@ struct WorkoutCard: View {
 // Цвет в зависимости от категории
 func categoryColor(_ category: String) -> Color {
     switch category {
-    case "Кардио": return .red
-    case "Силовые": return .blue
-    case "Растяжка": return .green
-    case "Техника": return .purple
-    case "Комбинации": return .orange
-    case "Разминка": return .yellow
-    case "Заминка": return .mint
-    default: return .gray
+    case "Разминка":
+        return .orange
+    case "Техника":
+        return .blue
+    case "Силовые":
+        return .red
+    case "Кардио":
+        return .pink
+    case "Заминка":
+        return .green
+    case "Растяжка":
+        return .purple
+    case "Комбинации":
+        return .yellow
+    default:
+        return .gray
     }
 }
 
-// Цвет в зависимости от уровня
-func levelColor(_ level: String) -> Color {
-    switch level {
-    case "Начинающий": return .green
-    case "Средний": return .yellow
-    case "Продвинутый": return .orange
-    case "Профессионал": return .red
-    default: return .gray
+// Иконка в зависимости от категории
+func categoryIcon(_ category: String) -> String {
+    switch category {
+    case "Разминка":
+        return "flame.fill"
+    case "Техника":
+        return "figure.boxing"
+    case "Силовые":
+        return "dumbbell.fill"
+    case "Кардио":
+        return "heart.fill"
+    case "Заминка":
+        return "wind"
+    case "Растяжка":
+        return "figure.flexibility"
+    case "Комбинации":
+        return "figure.boxing.motion"
+    default:
+        return "questionmark.circle"
     }
 }
-
-#Preview {
-    NavigationView {
-        WorkoutView()
-    }
-}
-

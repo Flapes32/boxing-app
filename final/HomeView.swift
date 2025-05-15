@@ -228,7 +228,7 @@ struct HomeView: View {
         .navigationBarHidden(true)
         .fullScreenCover(isPresented: $showingTimer) {
             NavigationView {
-                TimerView()
+                TimerView(workoutExercises: [])
             }
         }
     }
