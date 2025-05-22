@@ -29,11 +29,16 @@ struct TimerView: View {
     
     // Общее количество раундов всех упражнений
     var totalRounds: Int {
-        exerciseProgress.reduce(0) { $0 + $1.rounds }
+        let total = exerciseProgress.reduce(0) { $0 + $1.rounds }
+        return max(total, 1) // Минимум 1 раунд, даже если массив пустой
     }
     
     // Текущий общий раунд (с учетом всех упражнений)
     var currentTotalRound: Int {
+        if exerciseProgress.isEmpty {
+            return 1 // Если массив пуст, возвращаем 1
+        }
+        
         var total = currentRoundIndex
         for i in 0..<currentExerciseIndex {
             total += exerciseProgress[i].rounds

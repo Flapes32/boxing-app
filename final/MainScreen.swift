@@ -37,7 +37,9 @@ struct MainScreen: View {
             
             // Timer tab
             NavigationView {
-                TimerView(workoutExercises: [])
+                TimerView(workoutExercises: [
+                    WorkoutExercise(exercise: ExerciseDatabase.exercises[0], rounds: 3)
+                ])
             }
             .tabItem {
                 Label("Таймер", systemImage: "timer")
