@@ -27,23 +27,54 @@ final class WatchConnectivityManager: NSObject, ObservableObject {
         activateSession()
     }
     
-    // Активация сессии WatchConnectivity
+    // Активация сессии WatchConnectivity с защитой от сбоев
     private func activateSession() {
-        guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        session.delegate = self
-        session.activate()
+        do {
+            guard WCSession.isSupported() else {
+                print("WCSession не поддерживается на этом устройстве")
+                return 
+            }
+            
+            let session = WCSession.default
+            session.delegate = self
+            
+            // Защита от возможных сбоев при активации
+            DispatchQueue.main.async {
+                session.activate()
+                print("WCSession активирован успешно")
+            }
+        } catch {
+            print("Ошибка при активации WCSession: \(error.localizedDescription)")
+        }
     }
     
-    // Проверка доступности Apple Watch
+    // Проверка доступности Apple Watch с защитой от сбоев
     func checkWatchAvailability() {
-        guard WCSession.isSupported() else { return }
-        let session = WCSession.default
-        
-        DispatchQueue.main.async {
-            self.isPaired = session.isPaired
-            self.isReachable = session.isReachable
-            self.isWatchAppInstalled = session.isWatchAppInstalled
+        do {
+            guard WCSession.isSupported() else {
+                print("WCSession не поддерживается при проверке доступности")
+                return 
+            }
+            
+            let session = WCSession.default
+            
+            // Безопасное получение статуса на главном потоке
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                
+                // Защита от возможных сбоев при проверке статуса
+                let isPaired = session.isPaired
+                let isReachable = session.isReachable
+                let isWatchAppInstalled = session.isWatchAppInstalled
+                
+                print("Статус Apple Watch: сопряжены=\(isPaired), доступны=\(isReachable), приложение установлено=\(isWatchAppInstalled)")
+                
+                self.isPaired = isPaired
+                self.isReachable = isReachable
+                self.isWatchAppInstalled = isWatchAppInstalled
+            }
+        } catch {
+            print("Ошибка при проверке доступности Apple Watch: \(error.localizedDescription)")
         }
     }
     

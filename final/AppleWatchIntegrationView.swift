@@ -5,158 +5,215 @@ import Charts
 
 // MARK: - SwiftUI View
 struct AppleWatchIntegrationView: View {
-    @StateObject private var wcManager = WatchConnectivityManager.shared
+        @StateObject private var wcManager = WatchConnectivityManager.shared
     @State private var selectedTimeFrame: TimeFrame = .day
     @State private var showConnectionInfo = false
     @State private var showSyncSheet = false
     
     var body: some View {
-        ScrollView {
+        ZStack {
+            Color.black.edgesIgnoringSafeArea(.all)
+            
             VStack(spacing: 20) {
                 // Заголовок и статус подключения
                 HStack {
-                    Image(systemName: "figure.boxing")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 50, height: 50)
-                        .foregroundStyle(.red)
-                    
-                    VStack(alignment: .leading) {
-                        Text("Ринг-статистика")
-                            .font(.title).bold()
-                        
-                        HStack {
-                            Circle()
-                                .fill(wcManager.isReachable ? Color.green : Color.red)
-                                .frame(width: 10, height: 10)
-                            
-                            Text(wcManager.isReachable ? "Apple Watch подключены" : "Apple Watch не подключены")
-                                .font(.caption)
-                                .foregroundColor(wcManager.isReachable ? .green : .red)
-                        }
+                    Button(action: {}) {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(.white)
                     }
                     
                     Spacer()
                     
+                    Text("Apple Watch")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    Spacer()
+                    
                     Button(action: {
-                        wcManager.checkWatchAvailability()
+                        // В демо-режиме просто показываем информацию
                         showConnectionInfo = true
                     }) {
                         Image(systemName: "info.circle")
-                            .font(.title2)
-                    }
-                    .alert("Статус подключения", isPresented: $showConnectionInfo) {
-                        Button("ОК", role: .cancel) { }
-                    } message: {
-                        Text("Часы сопряжены: \(wcManager.isPaired ? "Да" : "Нет")\nЧасы доступны: \(wcManager.isReachable ? "Да" : "Нет")\nПриложение установлено: \(wcManager.isWatchAppInstalled ? "Да" : "Нет")")
+                            .foregroundColor(.white)
                     }
                 }
                 .padding(.horizontal)
                 
-                // Кнопки управления тренировкой
-                workoutControlsView
-                
-                // Текущие показатели
-                currentMetricsView
-                
-                // Переключатель временного интервала для графиков
-                timeFrameSelector
-                
-                // График пульса
-                heartRateChartView
-                
-                // График калорий
-                caloriesChartView
-            }
-            .padding(.vertical)
-        }
-        .navigationTitle("Apple Watch")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    showSyncSheet = true
-                }) {
-                    Image(systemName: "arrow.triangle.2.circlepath")
+                // Иконка Apple Watch с кружком
+                ZStack {
+                    Circle()
+                        .fill(Color.yellow.opacity(0.3))
+                        .frame(width: 100, height: 100)
+                    
+                    Circle()
+                        .fill(Color.yellow)
+                        .frame(width: 80, height: 80)
+                    
+                    Image(systemName: "applewatch")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 40, height: 40)
+                        .foregroundColor(.white)
                 }
-                .disabled(!wcManager.isReachable)
+                .padding(.top, 10)
+                
+                Text("Статистика Apple Watch")
+                    .font(.title3)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                // Статус подключения
+                HStack {
+                    Image(systemName: wcManager.isReachable ? "checkmark.circle.fill" : "xmark.circle.fill")
+                        .foregroundColor(wcManager.isReachable ? .green : .red)
+                    
+                    Text(wcManager.isReachable ? "Часы подключены" : "Часы не подключены")
+                        .foregroundColor(wcManager.isReachable ? .green : .red)
+                }
+                .padding(.bottom, 10)
+                
+                Text("СТАТИСТИКА ТРЕНИРОВКИ")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.gray)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                
+                // Показатели тренировки в сетке
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    MetricCardView(
+                        icon: "heart.fill",
+                        value: "130",
+                        unit: "bpm",
+                        title: "Пульс",
+                        color: .red
+                    )
+                    
+                    MetricCardView(
+                        icon: "circle.grid.3x3.fill",
+                        value: "3",
+                        unit: "",
+                        title: "Раунды",
+                        color: .yellow
+                    )
+                    
+                    MetricCardView(
+                        icon: "flame.fill",
+                        value: "350",
+                        unit: "kcal",
+                        title: "Калории",
+                        color: .orange
+                    )
+                    
+                    MetricCardView(
+                        icon: "clock.fill",
+                        value: "15",
+                        unit: "мин",
+                        title: "Время",
+                        color: .blue
+                    )
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+                
+                // Нижняя панель навигации
+                
+            
             }
         }
-        .sheet(isPresented: $showSyncSheet) {
-            syncOptionsView
+        .alert("Статус подключения", isPresented: $showConnectionInfo) {
+            Button("ОК", role: .cancel) { }
+        } message: {
+            Text("Часы сопряжены: \(wcManager.isPaired ? "Да" : "Нет")\nЧасы доступны: \(wcManager.isReachable ? "Да" : "Нет")\nПриложение установлено: \(wcManager.isWatchAppInstalled ? "Да" : "Нет")")
         }
         .onAppear {
-            wcManager.checkWatchAvailability()
-            wcManager.requestWorkoutData()
+            // Безопасная инициализация с задержкой для iOS 18.4.1
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak wcManager] in
+                guard let wcManager = wcManager else { return }
+                
+                // Проверка доступности часов
+                wcManager.checkWatchAvailability()
+                
+                // Запрос данных только если часы доступны
+                if wcManager.isReachable {
+                    wcManager.requestWorkoutData()
+                }
+            }
         }
+        .preferredColorScheme(.dark)
     }
     
     // MARK: - Компоненты интерфейса
     
-    // Кнопки управления тренировкой
-    private var workoutControlsView: some View {
-        HStack(spacing: 20) {
-            Button(action: {
-                if wcManager.isWorkoutInProgress {
-                    wcManager.stopWorkout()
-                } else {
-                    wcManager.startWorkout()
-                }
-            }) {
-                HStack {
-                    Image(systemName: wcManager.isWorkoutInProgress ? "stop.fill" : "play.fill")
-                    Text(wcManager.isWorkoutInProgress ? "Завершить" : "Начать тренировку")
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(wcManager.isWorkoutInProgress ? Color.red : Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(10)
-            }
-            .disabled(!wcManager.isReachable)
-            
-            if wcManager.isWorkoutInProgress {
-                Button(action: {
-                    wcManager.pauseWorkout()
-                }) {
-                    HStack {
-                        Image(systemName: "pause.fill")
-                        Text("Пауза")
+    // Компонент для отображения метрики в стиле скриншота
+    struct MetricCardView: View {
+        let icon: String
+        let value: String
+        let unit: String
+        let title: String
+        let color: Color
+        
+        var body: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.black)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(color, lineWidth: 2)
+                    )
+                
+                VStack(spacing: 5) {
+                    Image(systemName: icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 30, height: 30)
+                        .foregroundColor(color)
+                    
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text(value)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(.white)
+                        
+                        if !unit.isEmpty {
+                            Text(unit)
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
+                        }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 10)
-                    .background(Color.orange)
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
+                    
+                    Text(title)
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
-                .disabled(!wcManager.isReachable)
+                .padding()
             }
+            .frame(height: 120)
         }
-        .padding(.horizontal)
     }
     
-    // Текущие показатели тренировки
-    private var currentMetricsView: some View {
-        let data = wcManager.latestWorkoutData ?? WatchWorkoutData.sample
+    // Компонент для кнопки нижней панели навигации
+    struct TabBarButton: View {
+        let icon: String
+        let text: String
+        let isSelected: Bool
         
-        return VStack(spacing: 15) {
-            Text("Текущие показатели")
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal)
-            
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
-                MetricsCard(title: "Пульс", value: String(format: "%.0f", data.heartRate), unit: "bpm", systemImage: "heart.fill", colors: [.red, .black])
-                MetricsCard(title: "Раунды", value: "\(data.rounds)", unit: "", systemImage: "circle.fill", colors: [.blue, .indigo])
-                MetricsCard(title: "Калории", value: String(format: "%.0f", data.activeEnergy), unit: "kcal", systemImage: "flame.fill", colors: [.yellow, .orange])
-                MetricsCard(title: "Время", value: String(format: "%.0f", data.workoutDuration/60), unit: "мин", systemImage: "timer", colors: [.teal, .blue])
-                MetricsCard(title: "Дистанция", value: String(format: "%.1f", data.distance/1000), unit: "км", systemImage: "location.fill", colors: [.purple, .black])
-                MetricsCard(title: "Макс. пульс", value: String(format: "%.0f", data.maxHeartRate), unit: "bpm", systemImage: "waveform.path.ecg", colors: [.pink, .red])
+        var body: some View {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 20, height: 20)
+                    .foregroundColor(isSelected ? .yellow : .gray)
+                
+                Text(text)
+                    .font(.system(size: 10))
+                    .foregroundColor(isSelected ? .yellow : .gray)
             }
-            .padding(.horizontal)
-            
-            // Интенсивность тренировки
-            GaugeCard(title: "Интенсивность", value: data.heartRate, max: 200, colors: [.green, .yellow, .red])
-                .padding(.horizontal)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
         }
     }
     
@@ -167,6 +224,8 @@ struct AppleWatchIntegrationView: View {
                 .font(.headline)
             
             Spacer()
+            
+            TabBarButton(icon: "ellipsis", text: "Еще", isSelected: true)
             
             Picker("", selection: $selectedTimeFrame) {
                 ForEach(TimeFrame.allCases, id: \.self) { timeFrame in
@@ -442,3 +501,5 @@ enum TimeFrame: String, CaseIterable {
 #Preview {
     NavigationView { AppleWatchIntegrationView() }
 }
+
+
