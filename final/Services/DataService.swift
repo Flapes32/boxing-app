@@ -21,72 +21,45 @@ class DataService: ObservableObject, @unchecked Sendable {
     @Published var isLoading = false
     @Published var error: NetworkError?
     
-    // Флаг авторизации
-    @Published var isAuthenticated = false
+    // Флаг авторизации - всегда true для упрощения без аутентификации
+    @Published var isAuthenticated = true
     
     private init() {
-        // Проверка наличия сохраненного токена при инициализации
-        if let token = UserDefaults.standard.string(forKey: "authToken") {
-            NetworkManager.shared.setAuthToken(token)
-            isAuthenticated = true
-            
-            // Загрузка данных пользователя
-            Task {
-                await loadCurrentUser()
-            }
+        // Создаем тестового пользователя
+        createTestUser()
+        
+        // Загрузка тестовых данных
+        Task {
+            await loadMockData()
         }
     }
     
-    // MARK: - Аутентификация
-    
-    // Метод для загрузки данных пользователя
-    func loadUserData() async {
-        isLoading = true
-        error = nil
+    // Создание тестового пользователя
+    private func createTestUser() {
+        let testUser = User(
+            id: "test-user-id",
+            username: "testuser",
+            fullName: "Тестовый Пользователь",
+            email: "test@example.com",
+            profileImageUrl: nil,
+            height: 180,
+            weight: 75,
+            age: 30,
+            trainingDays: 15,
+            totalWorkouts: 25,
+            rank: "Любитель",
+            level: 3,
+            joinDate: Date(),
+            isActive: true
+        )
+        
+        self.currentUser = testUser
         
         do {
-            // Получаем данные аутентификации
-            let authDataResult = try AuthenticationManager.shared.getAuthenticatedUser()
-            
-            // Пытаемся загрузить данные из Realm
-            if let user = RealmService.shared.getUser(id: authDataResult.uid) {
-                self.currentUser = user
-                
-                // Загружаем тренировки и достижения
-                self.workouts = RealmService.shared.getUserWorkouts(userId: user.id)
-                self.achievements = RealmService.shared.getUserAchievements(userId: user.id)
-                
-                // Настраиваем наблюдение за изменениями
-                setupObservers(userId: user.id)
-            } else {
-                // Создаем нового пользователя в Realm
-                let newUser = User(
-                    id: authDataResult.uid,
-                    username: "",
-                    fullName: "",
-                    email: authDataResult.email ?? "",
-                    profileImageUrl: nil,
-                    height: 0,
-                    weight: 0,
-                    age: 0,
-                    trainingDays: 0,
-                    totalWorkouts: 0,
-                    rank: "Новичок",
-                    level: 1,
-                    joinDate: Date(),
-                    isActive: true
-                )
-                
-                try RealmService.shared.saveUser(newUser)
-                self.currentUser = newUser
-                setupObservers(userId: newUser.id)
-            }
-            
-            self.isAuthenticated = true
-            self.isLoading = false
+            try RealmService.shared.saveUser(testUser)
+            setupObservers(userId: testUser.id)
         } catch {
-            self.error = NetworkError.serverError(statusCode: 401, message: "Ошибка загрузки данных пользователя")
-            self.isLoading = false
+            print("Ошибка при создании тестового пользователя: \(error)")
         }
     }
     
@@ -100,40 +73,6 @@ class DataService: ObservableObject, @unchecked Sendable {
         // Наблюдение за тренировками
         RealmService.shared.observeUserWorkouts(userId: userId) { [weak self] workouts in
             self?.workouts = workouts
-        }
-    }
-    
-    // Метод для авторизации пользователя через Firebase
-    func login(email: String, password: String) async {
-        isLoading = true
-        error = nil
-        
-        do {
-            let _ = try await AuthenticationManager.shared.signInUser(email: email, password: password)
-            await loadUserData()
-            // Сбрасываем флаг загрузки после успешной авторизации
-            isLoading = false
-        } catch {
-            self.error = NetworkError.serverError(statusCode: 401, message: "Ошибка авторизации")
-            isLoading = false
-        }
-    }
-    
-    // Метод для выхода из аккаунта
-    func logout() {
-        do {
-            // Выход из Firebase
-            try AuthenticationManager.shared.signOut()
-            
-            // Очистка данных
-            self.currentUser = nil
-            self.isAuthenticated = false
-            self.workouts = []
-            self.exercises = []
-            self.userStats = nil
-            self.achievements = []
-        } catch {
-            print("Ошибка при выходе из аккаунта: \(error.localizedDescription)")
         }
     }
     
@@ -168,9 +107,9 @@ class DataService: ObservableObject, @unchecked Sendable {
                 self.error = networkError
                 self.isLoading = false
                 
-                // Если ошибка авторизации, выходим из системы
+                // Просто логируем ошибку авторизации
                 if case .unauthorized = networkError {
-                    self.logout()
+                    print("Ошибка авторизации: \(networkError)")
                 }
             }
         } catch {

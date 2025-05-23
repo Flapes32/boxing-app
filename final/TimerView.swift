@@ -53,14 +53,291 @@ struct TimerView: View {
         _sessionStartTime = State(initialValue: Date())
     }
     
+    // Вычисляемые свойства для упрощения основного метода body
+    private var gradientColors: [Color] {
+        let primaryColor = timerModel.timerMode == .work ? Color.red : Color.green
+        return [primaryColor.opacity(0.8), primaryColor.opacity(0.4)]
+    }
+    
+    private var backgroundCircleColor: Color {
+        let primaryColor = timerModel.timerMode == .work ? Color.red : Color.green
+        return primaryColor.opacity(0.1)
+    }
+    
+    private var headerTitle: String {
+        timerModel.timerMode == .work ? "РАУНД \(currentTotalRound)/\(totalRounds)" : "ОТДЫХ"
+    }
+    
+    private var headerBackgroundColor: Color {
+        let primaryColor = timerModel.timerMode == .work ? Color.red : Color.green
+        return primaryColor.opacity(0.3)
+    }
+    
+    private var headerView: some View {
+        Text(headerTitle)
+            .font(.system(size: 24, weight: .black, design: .rounded))
+            .foregroundColor(.white)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 25)
+            .background(
+                Capsule()
+                    .fill(headerBackgroundColor)
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                    )
+            )
+            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+    }
+    
+    private var timerModeText: String {
+        timerModel.timerMode == .work ? "РАБОТА" : "ОТДЫХ"
+    }
+    
+    private var progressValue: CGFloat {
+        let totalDuration = timerModel.timerMode == .work ? timerModel.workDuration : timerModel.restDuration
+        return 1.0 - (CGFloat(timerModel.secondsRemaining) / CGFloat(totalDuration))
+    }
+    
+    private var timerRingView: some View {
+        ZStack {
+            // Фоновое кольцо
+            Circle()
+                .stroke(lineWidth: 20)
+                .opacity(0.1)
+                .foregroundColor(.white)
+            
+            // Прогресс кольцо
+            Circle()
+                .trim(from: 0.0, to: progressValue)
+                .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
+                .foregroundColor(.white)
+                .rotationEffect(Angle(degrees: 270))
+                .animation(.linear(duration: 1.0), value: timerModel.secondsRemaining)
+            
+            VStack(spacing: 5) {
+                // Время
+                Text(timerModel.formatTime())
+                    .font(.system(size: 70, weight: .bold, design: .rounded))
+                    .foregroundColor(.white)
+                
+                // Режим
+                Text(timerModeText)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .frame(width: 250, height: 250)
+        .padding()
+    }
+    
+    // Функция для отображения текущего упражнения
+    private func currentExerciseView(exercise: WorkoutExercise) -> some View {
+        VStack(spacing: 5) {
+            Text("ТЕКУЩЕЕ УПРАЖНЕНИЕ")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.white.opacity(0.7))
+            
+            Text(exercise.exercise.name)
+                .font(.title2)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+            
+            Text(exercise.exercise.format)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
+            
+            Text("Раунд \(currentRoundIndex + 1) из \(exercise.rounds)")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.7))
+        }
+        .padding(.horizontal)
+        .padding(.bottom, 5)
+    }
+    
+    // Вычисляемое свойство для отображения прогресса тренировки
+    private var workoutProgressView: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("Прогресс тренировки:")
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal)
+            
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(0..<exerciseProgress.count, id: \.self) { index in
+                        exerciseProgressRow(index: index)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .frame(height: 120)
+        }
+    }
+    
+    // Функция для отображения строки прогресса упражнения
+    private func exerciseProgressRow(index: Int) -> some View {
+        let exercise = exerciseProgress[index]
+        return HStack(alignment: .center, spacing: 8) {
+            // Индикатор текущего упражнения
+            Circle()
+                .fill(index == currentExerciseIndex ? Color.blue : Color.clear)
+                .frame(width: 8, height: 8)
+            
+            // Название упражнения
+            Text(exercise.exercise.name)
+                .font(.subheadline)
+                .foregroundColor(index == currentExerciseIndex ? .white : .gray)
+                .lineLimit(1)
+                .frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
+            
+            // Индикаторы раундов
+            exerciseRoundIndicators(exercise: exercise, index: index)
+        }
+        .padding(.vertical, 6)
+        .padding(.horizontal, 10)
+        .background(index == currentExerciseIndex ? Color(.systemGray6).opacity(0.3) : Color.clear)
+        .cornerRadius(8)
+        .onTapGesture {
+            currentExerciseIndex = index
+            currentRoundIndex = 0
+        }
+    }
+    
+    // Функция для отображения индикаторов раундов
+    private func exerciseRoundIndicators(exercise: WorkoutExercise, index: Int) -> some View {
+        HStack(spacing: 3) {
+            ForEach(0..<min(exercise.rounds, 5), id: \.self) { roundIndex in
+                let isCompleted = index < currentExerciseIndex || (index == currentExerciseIndex && roundIndex < currentRoundIndex)
+                
+                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(isCompleted ? .green : .gray)
+                    .font(.system(size: 12))
+            }
+            
+            // Если больше 5 раундов, показываем текст
+            if exercise.rounds > 5 {
+                Text("+\(exercise.rounds - 5)")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
+        }
+    }
+    
+    // Вычисляемое свойство для навигации по упражнениям
+    private var exerciseNavigationView: some View {
+        HStack(spacing: 20) {
+            // Кнопка назад
+            Button(action: {
+                if currentExerciseIndex > 0 {
+                    currentExerciseIndex -= 1
+                    currentRoundIndex = 0
+                }
+            }) {
+                Image(systemName: "arrow.left.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white)
+            }
+            .disabled(currentExerciseIndex == 0)
+            .opacity(currentExerciseIndex == 0 ? 0.5 : 1.0)
+            
+            // Текущая позиция
+            Text("\(currentExerciseIndex + 1)/\(exerciseProgress.count)")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            // Кнопка вперед
+            Button(action: {
+                if currentExerciseIndex < exerciseProgress.count - 1 {
+                    currentExerciseIndex += 1
+                    currentRoundIndex = 0
+                }
+            }) {
+                Image(systemName: "arrow.right.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.white)
+            }
+            .disabled(currentExerciseIndex >= exerciseProgress.count - 1)
+            .opacity(currentExerciseIndex >= exerciseProgress.count - 1 ? 0.5 : 1.0)
+        }
+    }
+    
+    // Вычисляемое свойство для кнопок управления таймером
+    private var timerControlsView: some View {
+        HStack(spacing: 40) {
+            // Кнопка сброса текущего раунда
+            TimerButton(icon: "arrow.counterclockwise", action: {
+                timerModel.resetCurrentRound()
+            })
+            
+            // Кнопка старт/пауза (увеличенная)
+            ZStack {
+                Circle()
+                    .fill(Color.white.opacity(0.2))
+                    .frame(width: 80, height: 80)
+                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                
+                Button(action: {
+                    if timerModel.timerState == .running {
+                        timerModel.pauseTimer()
+                    } else {
+                        if timerModel.timerState == .stopped {
+                            timerModel.startTimer()
+                        } else {
+                            timerModel.resumeTimer()
+                        }
+                    }
+                }) {
+                    Image(systemName: timerModel.timerState == .running ? "pause.fill" : "play.fill")
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(.white)
+                }
+            }
+            
+            // Кнопка выхода к настройкам таймера
+            TimerButton(icon: "gear", action: {
+                timerModel.pauseTimer()
+                showingCustomizationView = true
+            })
+        }
+    }
+    
+    // Кнопка возврата назад
+    private var backButtonView: some View {
+        Button(action: {
+            timerModel.pauseTimer()
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            HStack {
+                Image(systemName: "arrow.left")
+                    .font(.headline)
+                Text("ВЕРНУТЬСЯ")
+                    .font(.headline)
+                    .fontWeight(.bold)
+            }
+            .foregroundColor(.white)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 30)
+            .background(
+                Capsule()
+                    .fill(Color.black.opacity(0.3))
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+    }
+    
     var body: some View {
         ZStack {
             // Фоновый градиент в зависимости от режима
             LinearGradient(
-                gradient: Gradient(colors: [
-                    timerModel.timerMode == .work ? Color.red.opacity(0.8) : Color.green.opacity(0.8),
-                    timerModel.timerMode == .work ? Color.red.opacity(0.4) : Color.green.opacity(0.4)
-                ]),
+                gradient: Gradient(colors: gradientColors),
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -68,259 +345,49 @@ struct TimerView: View {
             
             // Фоновые круги для дизайна
             Circle()
-                .fill(timerModel.timerMode == .work ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                .fill(backgroundCircleColor)
                 .frame(width: 300, height: 300)
                 .offset(x: -150, y: -200)
             
             Circle()
-                .fill(timerModel.timerMode == .work ? Color.red.opacity(0.1) : Color.green.opacity(0.1))
+                .fill(backgroundCircleColor)
                 .frame(width: 250, height: 250)
                 .offset(x: 150, y: 200)
             
             VStack(spacing: 30) {
                 // Заголовок с анимированным фоном
-                Text(timerModel.timerMode == .work ? "РАУНД \(currentTotalRound)/\(totalRounds)" : "ОТДЫХ")
-                    .font(.system(size: 24, weight: .black, design: .rounded))
-                    .foregroundColor(.white)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 25)
-                    .background(
-                        Capsule()
-                            .fill(timerModel.timerMode == .work ? Color.red.opacity(0.3) : Color.green.opacity(0.3))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 2)
-                            )
-                    )
-                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                headerView
                 
                 // Текущее упражнение
                 if let exercise = currentExercise {
-                    VStack(spacing: 5) {
-                        Text("ТЕКУЩЕЕ УПРАЖНЕНИЕ")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white.opacity(0.7))
-                        
-                        Text(exercise.exercise.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        
-                        Text(exercise.exercise.format)
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.8))
-                        
-                        Text("Раунд \(currentRoundIndex + 1) из \(exercise.rounds)")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 5)
+                    currentExerciseView(exercise: exercise)
                 }
                 
                 // Таймер с анимированным кольцом
-                ZStack {
-                    // Фоновое кольцо
-                    Circle()
-                        .stroke(lineWidth: 20)
-                        .opacity(0.1)
-                        .foregroundColor(.white)
-                    
-                    // Прогресс кольцо
-                    Circle()
-                        .trim(from: 0.0, to: 1.0 - (Double(timerModel.secondsRemaining) / Double(timerModel.timerMode == .work ? timerModel.workDuration : timerModel.restDuration)))
-                        .stroke(style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round))
-                        .foregroundColor(.white)
-                        .rotationEffect(Angle(degrees: 270))
-                        .animation(.linear(duration: 1.0), value: timerModel.secondsRemaining)
-                    
-                    VStack(spacing: 5) {
-                        // Время
-                        Text(timerModel.formatTime())
-                            .font(.system(size: 70, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                        
-                        // Режим
-                        Text(timerModel.timerMode == .work ? "РАБОТА" : "ОТДЫХ")
-                            .font(.subheadline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                }
-                .frame(width: 250, height: 250)
-                .padding()
+                timerRingView
                 
                 // Список всех упражнений с прогрессом
                 if !exerciseProgress.isEmpty {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Прогресс тренировки:")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(.horizontal)
-                        
-                        ScrollView(.vertical, showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(0..<exerciseProgress.count, id: \.self) { index in
-                                    let exercise = exerciseProgress[index]
-                                    HStack(alignment: .center, spacing: 8) {
-                                        // Индикатор текущего упражнения
-                                        if index == currentExerciseIndex {
-                                            Circle()
-                                                .fill(Color.blue)
-                                                .frame(width: 8, height: 8)
-                                        } else {
-                                            Circle()
-                                                .fill(Color.clear)
-                                                .frame(width: 8, height: 8)
-                                        }
-                                        
-                                        // Название упражнения
-                                        Text(exercise.exercise.name)
-                                            .font(.subheadline)
-                                            .foregroundColor(index == currentExerciseIndex ? .white : .gray)
-                                            .lineLimit(1)
-                                            .frame(minWidth: 80, maxWidth: .infinity, alignment: .leading)
-                                        
-                                        // Индикаторы раундов
-                                        HStack(spacing: 3) {
-                                            ForEach(0..<min(exercise.rounds, 5), id: \.self) { roundIndex in
-                                                let isCompleted = index < currentExerciseIndex || (index == currentExerciseIndex && roundIndex < currentRoundIndex)
-                                                
-                                                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                                                    .foregroundColor(isCompleted ? .green : .gray)
-                                                    .font(.system(size: 12))
-                                            }
-                                            
-                                            // Если больше 5 раундов, показываем текст
-                                            if exercise.rounds > 5 {
-                                                Text("+\(exercise.rounds - 5)")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.gray)
-                                            }
-                                        }
-                                    }
-                                    .padding(.vertical, 6)
-                                    .padding(.horizontal, 10)
-                                    .background(index == currentExerciseIndex ? Color(.systemGray6).opacity(0.3) : Color.clear)
-                                    .cornerRadius(8)
-                                    .onTapGesture {
-                                        currentExerciseIndex = index
-                                        currentRoundIndex = 0
-                                    }
-                                }
-                            }
-                            .padding(.horizontal)
-                        }
-                        .frame(height: 120)
-                    }
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.3))
-                    .cornerRadius(10)
-                    .padding(.horizontal, 5)
-                    
-                    // Навигация по упражнениям
-                    HStack(spacing: 20) {
-                        Button(action: {
-                            if currentExerciseIndex > 0 {
-                                currentExerciseIndex -= 1
-                                currentRoundIndex = 0
-                            }
-                        }) {
-                            Image(systemName: "arrow.left.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
-                        }
-                        .disabled(currentExerciseIndex == 0)
-                        .opacity(currentExerciseIndex == 0 ? 0.5 : 1.0)
-                        
-                        Text("\(currentExerciseIndex + 1)/\(exerciseProgress.count)")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        
-                        Button(action: {
-                            if currentExerciseIndex < exerciseProgress.count - 1 {
-                                currentExerciseIndex += 1
-                                currentRoundIndex = 0
-                            }
-                        }) {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundColor(.white)
-                        }
-                        .disabled(currentExerciseIndex == exerciseProgress.count - 1)
-                        .opacity(currentExerciseIndex == exerciseProgress.count - 1 ? 0.5 : 1.0)
-                    }
-                    .padding(.vertical, 5)
+                    workoutProgressView
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.3))
+                        .cornerRadius(10)
+                        .padding(.horizontal, 5)
                 }
                 
+                // Навигация по упражнениям
+                exerciseNavigationView
+                    .padding(.vertical, 10)
+                
                 // Кнопки управления с улучшенным дизайном
-                HStack(spacing: 40) {
-                    // Кнопка сброса текущего раунда
-                    TimerButton(icon: "arrow.counterclockwise", action: {
-                        timerModel.resetCurrentRound()
-                    })
-                    
-                    // Кнопка старт/пауза (увеличенная)
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.2))
-                            .frame(width: 80, height: 80)
-                            .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-                        
-                        Button(action: {
-                            if timerModel.timerState == .running {
-                                timerModel.pauseTimer()
-                            } else {
-                                if timerModel.timerState == .stopped {
-                                    timerModel.startTimer()
-                                } else {
-                                    timerModel.resumeTimer()
-                                }
-                            }
-                        }) {
-                            Image(systemName: timerModel.timerState == .running ? "pause.fill" : "play.fill")
-                                .font(.system(size: 30, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    
-                    // Кнопка выхода к настройкам таймера
-                    TimerButton(icon: "gear", action: {
-                        timerModel.pauseTimer()
-                        showingCustomizationView = true
-                    })
-                }
+                timerControlsView
+                    .padding(.vertical, 10)
                 
                 Spacer()
                 
                 // Кнопка возврата с улучшенным дизайном
-                Button(action: {
-                    timerModel.pauseTimer()
-                    presentationMode.wrappedValue.dismiss()
-                }) {
-                    HStack {
-                        Image(systemName: "arrow.left")
-                            .font(.headline)
-                        Text("ВЕРНУТЬСЯ")
-                            .font(.headline)
-                            .fontWeight(.bold)
-                    }
-                    .foregroundColor(.white)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 30)
-                    .background(
-                        Capsule()
-                            .fill(Color.black.opacity(0.3))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                }
-                .padding(.bottom, 20)
+                backButtonView
+                    .padding(.bottom, 20)
             }
             .padding()
         }
@@ -334,23 +401,11 @@ struct TimerView: View {
             timerModel.totalRounds = totalRounds
             sessionStartTime = Date()
         }
-        .onChange(of: timerModel.secondsRemaining) { oldValue, newValue in
+        .onChange(of: timerModel.secondsRemaining) { newValue in
             // Когда таймер достигает 0 и мы в режиме работы, увеличиваем счетчик выполненных раундов
-            if newValue == 0 && oldValue > 0 && timerModel.timerMode == .work {
+            if newValue == 0 && timerModel.timerMode == .work {
                 completeCurrentRound()
             }
-        }
-        .alert("Тренировка завершена!", isPresented: $workoutCompleted) {
-            Button("Сохранить результаты") {
-                saveWorkoutResults()
-                presentationMode.wrappedValue.dismiss()
-            }
-            
-            Button("Закрыть", role: .cancel) {
-                presentationMode.wrappedValue.dismiss()
-            }
-        } message: {
-            Text("Вы успешно завершили все упражнения! Хотите сохранить результаты тренировки?")
         }
     }
     
@@ -358,50 +413,26 @@ struct TimerView: View {
     func completeCurrentRound() {
         guard currentExerciseIndex < exerciseProgress.count else { return }
         
-        // Увеличиваем счетчик выполненных раундов для текущего упражнения
+        // Увеличиваем счетчик текущего раунда
         currentRoundIndex += 1
-        exerciseProgress[currentExerciseIndex].completedRounds += 1
         
         // Если все раунды текущего упражнения выполнены, переходим к следующему упражнению
         if currentRoundIndex >= exerciseProgress[currentExerciseIndex].rounds {
-            // Переходим к следующему упражнению
-            if currentExerciseIndex < exerciseProgress.count - 1 {
-                currentExerciseIndex += 1
-                currentRoundIndex = 0
-            } else {
-                // Если это было последнее упражнение, проверяем, все ли упражнения завершены
-                checkWorkoutCompletion()
+            currentRoundIndex = 0
+            currentExerciseIndex += 1
+            
+            // Если все упражнения выполнены, отмечаем тренировку как завершенную
+            if currentExerciseIndex >= exerciseProgress.count {
+                workoutCompleted = true
+                sessionDuration = Int(Date().timeIntervalSince(sessionStartTime))
+                
+                // Здесь можно добавить логику для сохранения результатов тренировки
+                // и отображения экрана завершения
+                
+                // Возвращаемся к первому упражнению для возможности повторения
+                currentExerciseIndex = 0
             }
         }
-    }
-    
-    // Проверка завершения всей тренировки
-    func checkWorkoutCompletion() {
-        let allCompleted = exerciseProgress.allSatisfy { exercise in
-            exercise.completedRounds >= exercise.rounds
-        }
-        
-        if allCompleted {
-            // Рассчитываем общую продолжительность тренировки
-            sessionDuration = Int(Date().timeIntervalSince(sessionStartTime))
-            
-            // Останавливаем таймер
-            timerModel.pauseTimer()
-            
-            // Показываем сообщение о завершении
-            workoutCompleted = true
-        }
-    }
-    
-    // Сохранение результатов тренировки в базу данных
-    func saveWorkoutResults() {
-        // Сохраняем сессию тренировки с результатами
-        let _ = WorkoutSessionService.shared.saveWorkoutSession(
-            exercises: exerciseProgress,
-            totalDuration: sessionDuration
-        )
-        
-        print("Сохранены результаты тренировки продолжительностью \(sessionDuration) сек")
     }
 }
 
@@ -414,12 +445,12 @@ struct TimerButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.2))
-                    .frame(width: 60, height: 60)
-                    .shadow(color: .black.opacity(0.2), radius: 5, x: 0, y: 3)
+                    .fill(Color.white.opacity(0.15))
+                    .frame(width: 50, height: 50)
+                    .shadow(color: .black.opacity(0.1), radius: 5, x: 0, y: 3)
                 
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .bold))
+                    .font(.system(size: 22))
                     .foregroundColor(.white)
             }
         }
@@ -438,6 +469,8 @@ struct TimerCustomizationView: View {
     
     init(timerModel: BoxingTimer) {
         self.timerModel = timerModel
+        
+        // Инициализация состояний из модели
         _workMinutes = State(initialValue: Double(timerModel.workDuration / 60))
         _workSeconds = State(initialValue: Double(timerModel.workDuration % 60))
         _restMinutes = State(initialValue: Double(timerModel.restDuration / 60))
@@ -451,16 +484,21 @@ struct TimerCustomizationView: View {
                 Color.black.edgesIgnoringSafeArea(.all)
                 
                 VStack(spacing: 30) {
+                    Text("Настройки таймера")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
                     // Настройка времени работы
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("ВРЕМЯ РАБОТЫ")
+                        Text("Время работы")
                             .font(.headline)
                             .foregroundColor(.white)
                         
                         HStack {
                             VStack {
                                 Text("\(Int(workMinutes)) мин")
-                                    .font(.title3)
+                                    .font(.subheadline)
                                     .foregroundColor(.white)
                                 
                                 Slider(value: $workMinutes, in: 0...10, step: 1)
@@ -469,7 +507,7 @@ struct TimerCustomizationView: View {
                             
                             VStack {
                                 Text("\(Int(workSeconds)) сек")
-                                    .font(.title3)
+                                    .font(.subheadline)
                                     .foregroundColor(.white)
                                 
                                 Slider(value: $workSeconds, in: 0...59, step: 5)
@@ -478,19 +516,19 @@ struct TimerCustomizationView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6).opacity(0.3))
+                    .background(Color(.systemGray6).opacity(0.2))
                     .cornerRadius(15)
                     
                     // Настройка времени отдыха
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("ВРЕМЯ ОТДЫХА")
+                        Text("Время отдыха")
                             .font(.headline)
                             .foregroundColor(.white)
                         
                         HStack {
                             VStack {
                                 Text("\(Int(restMinutes)) мин")
-                                    .font(.title3)
+                                    .font(.subheadline)
                                     .foregroundColor(.white)
                                 
                                 Slider(value: $restMinutes, in: 0...5, step: 1)
@@ -499,7 +537,7 @@ struct TimerCustomizationView: View {
                             
                             VStack {
                                 Text("\(Int(restSeconds)) сек")
-                                    .font(.title3)
+                                    .font(.subheadline)
                                     .foregroundColor(.white)
                                 
                                 Slider(value: $restSeconds, in: 0...59, step: 5)
@@ -508,49 +546,73 @@ struct TimerCustomizationView: View {
                         }
                     }
                     .padding()
-                    .background(Color(.systemGray6).opacity(0.3))
+                    .background(Color(.systemGray6).opacity(0.2))
+                    .cornerRadius(15)
+                    
+                    // Настройка количества раундов
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Количество раундов")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        HStack {
+                            Slider(value: $rounds, in: 1...20, step: 1)
+                                .accentColor(.blue)
+                            
+                            Text("\(Int(rounds))")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .frame(width: 40)
+                        }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6).opacity(0.2))
                     .cornerRadius(15)
                     
                     Spacer()
                     
-                    // Кнопка сохранения настроек
+                    // Кнопка сохранения
                     Button(action: {
-                        // Сохранение настроек
+                        // Сохраняем настройки в модель
                         timerModel.workDuration = Int(workMinutes) * 60 + Int(workSeconds)
                         timerModel.restDuration = Int(restMinutes) * 60 + Int(restSeconds)
+                        timerModel.totalRounds = Int(rounds)
+                        
+                        // Сбрасываем таймер с новыми настройками
                         timerModel.resetTimer()
                         
+                        // Закрываем окно настроек
                         presentationMode.wrappedValue.dismiss()
                     }) {
-                        Text("СОХРАНИТЬ")
+                        Text("Сохранить настройки")
                             .font(.headline)
-                            .fontWeight(.bold)
                             .foregroundColor(.white)
-                            .padding(.vertical, 15)
+                            .padding()
                             .frame(maxWidth: .infinity)
-                            .background(Color.blue)
+                            .background(LinearGradient(gradient: Gradient(colors: [.blue, .purple]), startPoint: .leading, endPoint: .trailing))
                             .cornerRadius(15)
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Настройки таймера")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Готово") {
-                        presentationMode.wrappedValue.dismiss()
-                    }
-                }
-            }
+            .navigationBarTitle("", displayMode: .inline)
+            .navigationBarItems(trailing: Button(action: {
+                presentationMode.wrappedValue.dismiss()
+            }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.white)
+            })
         }
     }
 }
 
-#Preview {
-    TimerView(workoutExercises: [
-        WorkoutExercise(exercise: ExerciseDatabase.exercises[0], rounds: 3),
-        WorkoutExercise(exercise: ExerciseDatabase.exercises[1], rounds: 2),
-        WorkoutExercise(exercise: ExerciseDatabase.exercises[2], rounds: 1)
-    ])
+struct TimerView_Previews: PreviewProvider {
+    static var previews: some View {
+        TimerView(workoutExercises: [
+            WorkoutExercise(exercise: ExerciseDatabase.exercises[0], rounds: 3),
+            WorkoutExercise(exercise: ExerciseDatabase.exercises[1], rounds: 2),
+            WorkoutExercise(exercise: ExerciseDatabase.exercises[2], rounds: 4)
+        ])
+    }
 }

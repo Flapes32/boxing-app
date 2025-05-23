@@ -186,19 +186,26 @@ struct HomeView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 10)
                     
-                    // Кнопка выхода из аккаунта
+                    // Кнопка сброса данных (замена кнопки выхода из аккаунта)
                     Button(action: {
-                        // Выход из аккаунта
-                        dataService.logout()
+                        // Очистка локальных данных
+                        UserDefaults.standard.removeObject(forKey: "authToken")
+                        // Обновление интерфейса
+                        withAnimation {
+                            dataService.isLoading = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+                                dataService.isLoading = false
+                            }
+                        }
                     }) {
                         HStack {
                             Spacer()
                             
                             HStack {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
+                                Image(systemName: "arrow.clockwise.circle")
                                     .foregroundColor(.white)
                                 
-                                Text("Выйти из аккаунта")
+                                Text("Обновить данные")
                                     .font(.headline)
                                     .foregroundColor(.white)
                             }
@@ -208,14 +215,14 @@ struct HomeView: View {
                         .padding()
                         .background(
                             LinearGradient(
-                                gradient: Gradient(colors: [Color.red.opacity(0.7), Color.red]),
+                                gradient: Gradient(colors: [Color.blue.opacity(0.7), Color.blue]),
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
                         )
-                        .cornerRadius(15)
-                        .padding(.horizontal)
+                        .cornerRadius(10)
                     }
+                    .padding(.horizontal)
                     .padding(.vertical, 10)
                     
                     // Добавляем отступ снизу для таб-бара

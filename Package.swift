@@ -8,17 +8,15 @@ let package = Package(
         .library(name: "BoxingApp", targets: ["BoxingApp"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/firebase/firebase-ios-sdk.git", from: "10.0.0"),
+        .package(url: "https://github.com/realm/realm-swift.git", from: "10.33.0"),
     ],
     targets: [
         .target(
             name: "BoxingApp",
             dependencies: [
-                .product(name: "FirebaseAuth", package: "firebase-ios-sdk"),
-                .product(name: "FirebaseFirestore", package: "firebase-ios-sdk"),
-                .product(name: "FirebaseFirestoreSwift", package: "firebase-ios-sdk"),
-                .product(name: "FirebaseStorage", package: "firebase-ios-sdk"),
-            ]
+                .product(name: "RealmSwift", package: "realm-swift"),
+            ],
+            path: "final"
         ),
     ]
 )

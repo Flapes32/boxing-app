@@ -1,7 +1,6 @@
 import SwiftUI
 import WatchConnectivity
 import Combine
-import Charts
 
 // MARK: - SwiftUI View
 struct AppleWatchIntegrationView: View {
@@ -455,7 +454,7 @@ struct MetricsCard: View {
     }
 }
 
-struct GaugeCard: View {
+struct ProgressCard: View {
     let title: String
     let value: Double
     let max: Double
@@ -475,15 +474,29 @@ struct GaugeCard: View {
                 Text(title)
                     .font(.caption)
                     .foregroundColor(.white.opacity(0.8))
-                Gauge(value: value, in: 0...max) {
-                    EmptyView()
-                } currentValueLabel: {
+                // Заменяем Gauge на простой прогресс-бар для совместимости с iOS 15
+                HStack {
+                    // Простой прогресс-бар без использования ProgressViewStyle
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .frame(width: geometry.size.width, height: 8)
+                                .opacity(0.3)
+                                .foregroundColor(Color.gray)
+                            
+                            Rectangle()
+                                .frame(width: min(CGFloat(value) / CGFloat(max) * geometry.size.width, geometry.size.width), height: 8)
+                                .foregroundColor(Color.orange)
+                        }
+                        .cornerRadius(4)
+                    }
+                    .frame(height: 8)
+                    
                     Text("\(Int(value)) bpm")
                         .foregroundColor(.white)
                         .fontWeight(.bold)
+                        .padding(.leading, 8)
                 }
-                .gaugeStyle(.accessoryLinearCapacity)
-                .tint(LinearGradient(gradient: gradient, startPoint: .leading, endPoint: .trailing))
             }
             .padding()
         }
